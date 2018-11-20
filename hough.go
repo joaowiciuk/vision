@@ -11,6 +11,9 @@ import (
 	"github.com/fogleman/gg"
 )
 
+// HoughPoint represents a single point in the Hough space with
+// its score, theta and rho values and and minimum and maximum
+// corresponding spatial points.
 type HoughPoint struct {
 	Indexes    []int
 	Score      int
@@ -18,6 +21,8 @@ type HoughPoint struct {
 	SpatialMax []int
 }
 
+// HoughSpace stores the relevant data from the Hough transform
+// algorithm.
 type HoughSpace struct {
 	ThetaAxisSize  int
 	RAxisSize      int
@@ -34,6 +39,21 @@ func (h HoughPoint) String() string {
 		return "{}"
 	}
 	return fmt.Sprintf("{%4d,%4d:%4d}", h.Indexes[0], h.Indexes[1], h.Score)
+}
+
+// Encode returns a unique integer representation for each
+// Hough point.
+func (h HoughPoint) Encode() int {
+	return cantorPairing(h.Indexes[0], h.Indexes[1])
+}
+
+type Line struct {
+	Slope float64
+	Point image.Point
+}
+
+func (l Line) String() string {
+	return fmt.Sprintf("(Slope: %.2f, X: %4d, Y: %4d)", l.Slope, l.Point.X, l.Point.Y)
 }
 
 /* func Hough(input *image.Gray, maxLines int) (houghSpace *image.Gray, lines []*Line) {
@@ -151,7 +171,9 @@ func (h *HoughSpace) HoughImage() *image.Gray {
 	return i
 }
 
-func (h *HoughSpace) LowPass(ratio float64) *HoughSpace {
+// LowPassScores filters out all the Hough points that are
+// not lesser than the given ratio of the maximum score.
+func (h *HoughSpace) LowPassScores(ratio float64) *HoughSpace {
 	h2 := &HoughSpace{
 		OriginalBounds: h.OriginalBounds,
 		RAxisSize:      h.RAxisSize,
@@ -192,7 +214,9 @@ func (h *HoughSpace) LowPass(ratio float64) *HoughSpace {
 	return h2
 }
 
-func (h *HoughSpace) HighPass(ratio float64) *HoughSpace {
+// HighPassScores filters out all the Hough points that are
+// not greater than the given ratio of the maximum score.
+func (h *HoughSpace) HighPassScores(ratio float64) *HoughSpace {
 	h2 := &HoughSpace{
 		OriginalBounds: h.OriginalBounds,
 		RAxisSize:      h.RAxisSize,
@@ -234,7 +258,10 @@ func (h *HoughSpace) HighPass(ratio float64) *HoughSpace {
 	return h2
 }
 
-func (h *HoughSpace) BandPass(lowerRatio, upperRatio float64) *HoughSpace {
+// BandPassScores filters out all the Hough points that are
+// greater or lesser than the given ratios of the maximum
+// score.
+func (h *HoughSpace) BandPassScores(lowerRatio, upperRatio float64) *HoughSpace {
 	h2 := &HoughSpace{
 		OriginalBounds: h.OriginalBounds,
 		RAxisSize:      h.RAxisSize,
@@ -284,6 +311,9 @@ func (h *HoughSpace) BandPass(lowerRatio, upperRatio float64) *HoughSpace {
 	return h2
 }
 
+// FindCentroids produces blobs by thresholding an image
+// representation of the Hough space and then represents each
+// blob with the point closest to its centroid.
 func (h *HoughSpace) FindCentroids(threshold uint8) *HoughSpace {
 	img := h.HoughImage()
 	aux := image.Image(img)
@@ -473,17 +503,6 @@ func (h *HoughSpace) PlotLines() *image.Gray {
 	return gray
 }
 
-type Line struct {
-	M      float64
-	X0, Y0 int
-}
-
-func (l Line) String() string {
-	return fmt.Sprintf("(M: %.2f, X0: %4d, Y0: %4d)", l.M, l.X0, l.Y0)
-}
-
-type Lines []Line
-
-func (h *HoughSpace) ExtractLines() *Lines {
+func (h *HoughSpace) ExtractLines() *[]Line {
 	return nil
 }
