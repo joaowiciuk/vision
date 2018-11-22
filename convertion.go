@@ -83,28 +83,6 @@ func Mat2Gray(mat *matrix.Matrix) (gray *image.Gray) {
 	return
 }
 
-// clamp bounds x to the nearest limit
-func clamp(x, min, max float64) (y float64) {
-	if x < min {
-		return min
-	}
-	if x > max {
-		return max
-	}
-	return x
-}
-
-// rescale returns the rescaled value of x from the interval (a0, a1) to the interval (b0, b1), inclusively
-func rescale(x, a0, a1, b0, b1 float64) float64 {
-	if x == a0 {
-		return b0
-	}
-	if x == a1 {
-		return b1
-	}
-	return (b1-b0)/(a1-a0)*(x-a1) + b1
-}
-
 // Mat2Im converts an valid array of matrices to an 8-bit color depth image and returns a pointer to it.
 // A valid array contains matrices of same size.
 // The function produces a grayscale image if the array has a single matrix and

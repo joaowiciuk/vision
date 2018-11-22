@@ -50,3 +50,35 @@ func generateVoronoi(binary *image.Gray, sx, sy []int) image.Image {
 func dot(x, y int) int {
 	return x*x + y*y
 }
+
+// clamp bounds x to the nearest limit
+func clamp(x, min, max float64) (y float64) {
+	if x < min {
+		return min
+	}
+	if x > max {
+		return max
+	}
+	return x
+}
+
+// rescale returns the rescaled value of x from the interval (a0, a1) to the interval (b0, b1), inclusively
+func rescale(x, a0, a1, b0, b1 float64) float64 {
+	if x == a0 {
+		return b0
+	}
+	if x == a1 {
+		return b1
+	}
+	return (b1-b0)/(a1-a0)*(x-a1) + b1
+}
+
+func pairing(x, y int) int {
+	/* return int(0.5 * float64((x+y)*(x+y+1)+y)) */
+
+	//Source: SZUDZIK, M. An Elegant Pairing Function. Wolphram Alpha
+	if x != max(x, y) {
+		return y*y + x
+	}
+	return x*x + x + y
+}
