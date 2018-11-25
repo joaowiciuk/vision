@@ -3,79 +3,71 @@ package vision
 import (
 	"image"
 	"math"
-
-	"github.com/joaowiciuk/matrix"
-	"github.com/joaowiciuk/vision/kernel"
 )
 
 // Grad computes the grad and returns its magnitude and angle.
 func Grad(gray *image.Gray) (mag, ang *image.Gray) {
-	k := 3
-	src := Gray2Mat(gray)
-	dx := kernel.SobelX(k)
-	dy := kernel.SobelY(k)
-	ma, na := dx.Size()
-	mb, nb := src.Size()
-	cxa, cya := dx.Center()
-	top, left, bottom, right := cya, cxa, ma-cya-1, na-cxa-1
-	x := func(c, r int) float64 {
-		if c >= 0 && c <= nb-1 && r >= 0 && r <= mb-1 {
-			return (*src)[r][c] //Inside
-		} else if c < 0 && r >= 0 && r <= mb-1 {
-			return (*src)[r][0] //Left
-		} else if r < 0 && c >= 0 && c <= nb-1 {
-			return (*src)[0][c] //Top
-		} else if c > nb-1 && r >= 0 && r <= mb-1 {
-			return (*src)[r][nb-1] //Right
-		} else if r > mb-1 && c >= 0 && c <= nb-1 {
-			return (*src)[mb-1][c] //Bottom
-		} else if c < 0 && r > mb-1 {
-			return (*src)[mb-1][0] //Bottom left corner
-		} else if c < 0 && r < 0 {
-			return (*src)[0][0] //Top left corner
-		} else if c > nb-1 && r < 0 {
-			return (*src)[0][nb-1] //Top right corner
+	dx := [][]float64{{1, 0, -1}, {2, 0, -2}, {1, 0, -1}}
+	dy := [][]float64{{1, 2, 1}, {0, 0, 0}, {-1, -2, -1}}
+	mb, nb := gray.Bounds().Dx(), gray.Bounds().Dy()
+
+	//Extend image signal at borders
+	signal := func(x, y int) float64 {
+		if x >= 0 && x <= nb-1 && y >= 0 && y <= mb-1 {
+			return float64(gray.Pix[y*nb+x]) //Inside
+		} else if x < 0 && y >= 0 && y <= mb-1 {
+			return float64(gray.Pix[y*nb]) //Left
+		} else if y < 0 && x >= 0 && x <= nb-1 {
+			return float64(gray.Pix[x]) //Top
+		} else if x > nb-1 && y >= 0 && y <= mb-1 {
+			return float64(gray.Pix[y*nb+(nb-1)]) //Right
+		} else if y > mb-1 && x >= 0 && x <= nb-1 {
+			return float64(gray.Pix[(mb-1)*nb+x]) //Bottom
+		} else if x < 0 && y > mb-1 {
+			return float64(gray.Pix[(mb-1)*nb]) //Bottom left corner
+		} else if x < 0 && y < 0 {
+			return float64(gray.Pix[0]) //Top left corner
+		} else if x > nb-1 && y < 0 {
+			return float64(gray.Pix[nb-1]) //Top right corner
 		} else {
-			return (*src)[mb-1][nb-1] //Bottom right corner
+			return float64(gray.Pix[(mb-1)*nb+(nb-1)]) //Bottom right corner
 		}
 	}
-	h := func(c, r int) (h1 float64, h2 float64) {
-		m, n := -r+cya, -c+cxa
+	sobel := func(x, y int) (sobelX float64, sobelY float64) {
+		m, n := -y+1, -x+1
 		if n < 0 || m < 0 {
 			return 1, 1
 		}
-		if n >= na || m >= ma {
+		if n >= 3 || m >= 3 {
 			return 1, 1
 		}
-		return (*dx)[m][n], (*dy)[m][n]
+		return dx[m][n], dy[m][n]
 	}
-	y := func(c, r int) (y1 float64, y2 float64) {
-		r0, r1 := r-top, r+bottom
-		c0, c1 := c-left, c+right
-		sum1 := 0.
-		sum2 := 0.
-		for j := r0; j <= r1; j++ {
-			for i := c0; i <= c1; i++ {
-				h1, h2 := h(c-i, r-j)
-				sum1 += x(i, j) * h1
-				sum2 += x(i, j) * h2
+	conv := func(x, y int) (convX float64, convY float64) {
+		y0, y1 := y-1, y+1
+		x0, x1 := x-1, x+1
+		convSumX := 0.
+		convSumY := 0.
+		for j := y0; j <= y1; j++ {
+			for k := x0; k <= x1; k++ {
+				h1, h2 := sobel(x-k, y-j)
+				convSumX += signal(k, j) * h1
+				convSumY += signal(k, j) * h2
 			}
 		}
-		return sum1, sum2
+		return convSumX, convSumY
 	}
-	magMat, angMat := matrix.New(mb, nb), matrix.New(mb, nb)
-	for r := 0; r < mb; r++ {
-		for c := 0; c < nb; c++ {
-			h, v := y(c, r)
-			(*magMat)[r][c] = math.Hypot(h, v)
-
-			(*angMat)[r][c] = math.Atan2(v, h) * 180 / math.Pi
-			for (*angMat)[r][c] < 0 {
-				(*angMat)[r][c] += 180
+	mag = image.NewGray(gray.Bounds())
+	ang = image.NewGray(gray.Bounds())
+	for y := 0; y < mb; y++ {
+		//Proccess lines concurrently
+		go func(y int, mag, ang *image.Gray) {
+			for x := 0; x < nb; x++ {
+				convX, convY := conv(x, y)
+				mag.Pix[y*nb+x] = uint8(rescale(math.Hypot(convX, convY), 0, 1530, 0, 255))
+				ang.Pix[y*nb+x] = uint8(rescale(math.Atan2(convY, convX), -math.Pi, math.Pi, 0, 255))
 			}
-		}
+		}(y, mag, ang)
 	}
-	mag = Mat2Gray(magMat)
-	ang = Mat2Gray(angMat)
-	return
+	return mag, ang
 }

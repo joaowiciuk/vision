@@ -1,0 +1,6 @@
+goos: linux
+goarch: amd64
+pkg: github.com/joaowiciuk/vision
+BenchmarkGrad-2   	     100	  27281882 ns/op
+PASS
+ok  	github.com/joaowiciuk/vision	2.993s
