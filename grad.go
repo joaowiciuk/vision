@@ -3,13 +3,14 @@ package vision
 import (
 	"image"
 	"math"
+	"sync"
 )
 
 // Grad computes the grad and returns its magnitude and angle.
 func Grad(gray *image.Gray) (mag, ang *image.Gray) {
 	dx := [][]float64{{1, 0, -1}, {2, 0, -2}, {1, 0, -1}}
 	dy := [][]float64{{1, 2, 1}, {0, 0, 0}, {-1, -2, -1}}
-	mb, nb := gray.Bounds().Dx(), gray.Bounds().Dy()
+	mb, nb := gray.Bounds().Dy(), gray.Bounds().Dx()
 
 	//Extend image signal at borders
 	signal := func(x, y int) float64 {
@@ -51,23 +52,28 @@ func Grad(gray *image.Gray) (mag, ang *image.Gray) {
 		for j := y0; j <= y1; j++ {
 			for k := x0; k <= x1; k++ {
 				h1, h2 := sobel(x-k, y-j)
-				convSumX += signal(k, j) * h1
-				convSumY += signal(k, j) * h2
+				s := signal(k, j)
+				convSumX += s * h1
+				convSumY += s * h2
 			}
 		}
 		return convSumX, convSumY
 	}
 	mag = image.NewGray(gray.Bounds())
 	ang = image.NewGray(gray.Bounds())
+	wg := sync.WaitGroup{}
 	for y := 0; y < mb; y++ {
 		//Proccess lines concurrently
-		go func(y int, mag, ang *image.Gray) {
+		wg.Add(1)
+		go func(y int, mag, ang *image.Gray, wg *sync.WaitGroup) {
 			for x := 0; x < nb; x++ {
 				convX, convY := conv(x, y)
 				mag.Pix[y*nb+x] = uint8(rescale(math.Hypot(convX, convY), 0, 1530, 0, 255))
 				ang.Pix[y*nb+x] = uint8(rescale(math.Atan2(convY, convX), -math.Pi, math.Pi, 0, 255))
 			}
-		}(y, mag, ang)
+			wg.Done()
+		}(y, mag, ang, &wg)
 	}
+	wg.Wait()
 	return mag, ang
 }

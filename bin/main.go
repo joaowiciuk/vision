@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"image"
+	"image/draw"
 	gio "io"
 	"log"
 	"os"
@@ -70,6 +71,7 @@ func main() {
 	var conv string
 	var morph string
 	var ccl int
+	var grad bool
 
 	var width int
 	var height int
@@ -95,6 +97,7 @@ func main() {
 	flag.StringVar(&conv, "conv", "boxblur", "-conv <kernel>")
 	flag.StringVar(&morph, "morph", "erode,se.png", "-morph <operation> <kernel file>")
 	flag.IntVar(&ccl, "ccl", 8, "-ccl <connectivity>")
+	flag.BoolVar(&grad, "grad", false, "Image gradient magnitude")
 
 	flag.Parse()
 
@@ -278,6 +281,12 @@ func main() {
 		default:
 			img = vision.Blobs(&img, vision.Connectivity8)
 		}
+	}
+
+	if flags["grad"] {
+		gray := image.NewGray(img.Bounds())
+		draw.Draw(gray, img.Bounds(), img, image.ZP, draw.Src)
+		img, _ = vision.Grad(gray)
 	}
 
 	fileName := out[:strings.LastIndex(out, ".")]

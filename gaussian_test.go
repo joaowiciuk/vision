@@ -9,9 +9,9 @@ import (
 )
 
 func TestGaussian(t *testing.T) {
-	img, _ := imgio.Open("test-images/house.png")
+	img, _ := imgio.Open("images/house.png")
 	gray := image.NewGray(img.Bounds())
 	draw.Draw(gray, img.Bounds(), img, image.ZP, draw.Src)
 	gaussian := Gaussian(gray, 1.4)
-	_ = imgio.Save("test-images/house-gaussian.png", gaussian, imgio.PNGEncoder())
+	_ = imgio.Save("images/house-gaussian.png", gaussian, imgio.PNGEncoder())
 }
